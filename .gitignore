@@ -1,0 +1,11 @@
+*.user
+*.[ao]
+*.autosave
+*.txt
+debug/
+release/
+*.debug
+*.release
+*.Debug
+*.Release
+Makefile
