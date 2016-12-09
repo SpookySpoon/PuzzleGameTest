@@ -1,11 +1,11 @@
 QT  += core gui
 QT  += widgets
 
-#CONFIG += c++11
-QT += testlib
+CONFIG += c++11
+#QT += testlib
 
 TARGET = Mainer
-#CONFIG += console
+CONFIG += console
 #CONFIG -= app_bundle
 
 TEMPLATE = app
