@@ -2,7 +2,7 @@ QT  += core gui
 QT  += widgets
 
 CONFIG += c++11
-#QT += testlib
+QT += testlib
 
 TARGET = Mainer
 CONFIG += console
