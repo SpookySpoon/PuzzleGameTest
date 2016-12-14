@@ -11,7 +11,8 @@ private slots:
     void testOnPushedButtons();
     void testOnPushedButtons_data();
     void testOnNewGame();
-//    void testOnRestart();
+    void testOnRestart();
+//    void testOnCheat(); //"Это не тестил так, как это незаконно (просто чит для отладки) =Р
 private:
     PuzzleManager puzMan;
 };
@@ -166,7 +167,6 @@ void PuzzleManagerTest::testOnPushedButtons_data()
     QTest::newRow("onPushButton_7") << QString("pushButton_7") <<1<< onPushButton_7;
 }
 
-
 void PuzzleManagerTest::testOnNewGame()
 {
 //Когда начинается новая игра, PuzzleManager отвечает только за перемешивание кнопок случайным образом.
@@ -206,8 +206,7 @@ void PuzzleManagerTest::testOnNewGame()
         QVariant someVar=jBond.first().first();
         QStringList someList=someVar.toStringList();
         QStringList someListSorted=someList;
-        QEXPECT_FAIL("", "New button order must differ from the initial one",Continue);
-        QCOMPARE(someList,initialButtons);                      //Требование №1
+        QVERIFY(someList!=initialButtons);                      //Требование №1
         std::sort(someListSorted.begin(),someListSorted.end());
         QCOMPARE(someListSorted,benchmark);                     //Требования №2 и 4
         QCOMPARE(someList.last(),QString(" "));                 //Требование №3
@@ -215,6 +214,59 @@ void PuzzleManagerTest::testOnNewGame()
     }
 }
 
+void PuzzleManagerTest::testOnRestart()
+{
+//Тут просто паззл откатывается к исходной последователььности фрагментов (имен кнопок в списке, который задаётся сразу после слота "OnNewGame()".
+//Следовательно проверить надо только то, что понажимав какие-то кнопки, если мы запустим "OnNewGame()", то PuzzleManager отправит UI список кнопок такой-же
+    //который он отправлял UI сразу после активации "OnNewGame()".
+//Для проверки этого, мы делаем следующее:
+    //1) Активируем "OnNewGame()", записываем сформировавшийся порядок кнопок (поскольку мы уже активировали "OnNewGame()" в предыдущем тесте,
+        //здесь мы уже не можем сравнивать результаты с упорядоченной последовательностью.
+    //2)Прожимаем все кнопки новой последовательности, кроме пробела(как минимум одна кнопка должна сдвинуться с места,
+        //а поскольку мы двигаемся по списку, повторно мы эту кнопку не сможем нажать и на место она не вернется. Т.е. нет риска, что у нас не пройдёт следующий тест).
+    //3)Убеждаемся, что получившийся список отличается от исходного (небольшая страховка, что все кнопки сработали. По сути это покрывается тестом testOnPushedButtons())
+        //Также убеждаемся, что получившийся список не пустой. Потому что, если он пустой, то это вообще фигня какая-то и нопки не двигались.
+    //4) Активируем OnRestart() и сравниваем вытащенный из сигнала список с тем списком, который мы записали в шаге 1. Они должны быть одинаковы.
+//Шаг 1
+    QPushButton pushButtNG;
+    QObject::connect(&pushButtNG,SIGNAL(clicked()),&puzMan,SLOT(onNewGame()));
+    QSignalSpy jBond(&puzMan,SIGNAL(assignedOrder(QVariant)));
+    pushButtNG.click();
+    QVariant someVar=jBond.first().first();
+    QStringList initialList=someVar.toStringList();
+    QCOMPARE(initialList.last(),QString(" "));//Просто по ходу теста смотрим, что в новом списке в конце стоит пробел
+    initialList.removeLast();
+//Шаг 2
+    QStringList tempList;
+    QString obana;
+    for (auto i:initialList)
+    {
+        QVERIFY(i!=QString(" "));//Просто по ходу теста смотрим, что нету лишних пробелов в списке
+        QPushButton pushPuzButt;
+        QObject::connect(&pushPuzButt,SIGNAL(clicked()),&puzMan,SLOT(onPushedButton()));
+        QSignalSpy jBondPuzzleButt(&puzMan,SIGNAL(assignedOrder(QVariant)));
+        pushPuzButt.setObjectName(i);//Меняем имя кнопки, чтобы PuzzleManager знал, кто его позвал.
+        pushPuzButt.click();
+        if(!jBondPuzzleButt.isEmpty())
+        {
+            QVariant samoVar=jBondPuzzleButt.first().first();
+            tempList.clear();
+            tempList=samoVar.toStringList();
+        }
+    }
+//Шаг 3
+    QVERIFY(tempList.count()==16);
+    initialList<<QString(" ");//Возвращаем конфискованный пробел
+    QVERIFY(tempList!=initialList);
+//Шаг 4
+    QPushButton pushButtReset;
+    QObject::connect(&pushButtReset,SIGNAL(clicked()),&puzMan,SLOT(onRestart()));
+    QSignalSpy jBondRestart(&puzMan,SIGNAL(assignedOrder(QVariant)));
+    pushButtReset.click();
+    QVariant someRVar=jBondRestart.first().first();
+    QStringList listAfterRestart=someRVar.toStringList();
+    QCOMPARE(initialList,listAfterRestart);//Должны быть одинаковыми
+}
 
 QTEST_MAIN(PuzzleManagerTest)
 #include "puzzlemanagertest.moc"
