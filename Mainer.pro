@@ -10,7 +10,7 @@ TEMPLATE = app
 
 SOURCES += \
 #    congratulatortest.cpp \
-    puzzlemanagertest.cpp
+    gameenginetest.cpp
 
 
 win32: LIBS += -L$$PWD/../../../Projects/build-SandBox2-Desktop_Qt_5_6_2_MinGW_32bit-Debug/debug/ -lSomeLib
@@ -21,3 +21,5 @@ DEPENDPATH += $$PWD/../../../Projects/build-SandBox2-Desktop_Qt_5_6_2_MinGW_32bi
 
 win32:!win32-g++: PRE_TARGETDEPS += $$PWD/../../../Projects/build-SandBox2-Desktop_Qt_5_6_2_MinGW_32bit-Debug/debug/SomeLib.lib
 else:win32-g++: PRE_TARGETDEPS += $$PWD/../../../Projects/build-SandBox2-Desktop_Qt_5_6_2_MinGW_32bit-Debug/debug/libSomeLib.a
+
+HEADERS +=
