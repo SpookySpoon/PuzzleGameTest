@@ -10,24 +10,28 @@ class PuzzleManagerTest : public QObject
 private slots:
     void testOnPushedButtons();
     void testOnPushedButtons_data();
+    void testOnNewGame();
+//    void testOnRestart();
 private:
     PuzzleManager puzMan;
 };
 
 void PuzzleManagerTest::testOnPushedButtons()
 {
+//При нажатии сегмента пазла, он должен прыгнуть в пустую ячейку, если она есть рядом, либо остаться на месте, если её рядом нет.
+//Сначала проверяется, что те кнопки, которые должны оставаться на месте, остаются на месте.
+//Потом проверяется, что те кнопки, которые должны двигаться, двигаются правильно (для них правильно рассчитывается позиция).
     QPushButton pushButt;
     QObject::connect(&pushButt,SIGNAL(clicked()),&puzMan,SLOT(onPushedButton()));
     QSignalSpy jBond(&puzMan,SIGNAL(assignedOrder(QVariant)));
     QFETCH(QString,buttonName);
     QFETCH(int,signalCount);
     QFETCH(QStringList,signalContent);
-//Механизм расчета позиции куска пазла таков основан на том, что PuzzleManager получает имя объекта -QObject::sender().
-//Затем, имея у себя QStringList имен кнопок в нужной последовательности, PuzzleManager при необходимости делает в своём QStringList и шлёт UI форме (puzzleform).
-//А дальше puzzleform настраивает раскладку кнопок согласно полученному QStringList.
+//Механизм расчета позиции куска пазла основан на том, что PuzzleManager получает имя кнопки через QObject::sender().
+//Затем, имея у себя QStringList имен кнопок в текущей последовательности, PuzzleManager при необходимости делает в своём QStringList перестановки и шлёт его UI форме (puzzleform).
+//А дальше puzzleform настраивает раскладку кнопок согласно полученному QStringList, в котором имена кнопок расположены в правильном порядке.
 
 //Это я всё к тому, что в нижней строчке меняется имя QObject::sender()-а (в нашем случае - кнопки), чтобы спровоцировать разное поведение PuzzleManager.
-
     pushButt.setObjectName(buttonName);
     pushButt.click();
 //Дальше, собственно, сам тест.
@@ -160,6 +164,55 @@ void PuzzleManagerTest::testOnPushedButtons_data()
                <<QString("pushButton_5")<<QString("pushButton_6")<<QString("pushButton_10")<<QString("pushButton_11")
               <<QString("pushButton_9")<<QString("pushButton_13")<<QString("pushButton_14")<<QString("pushButton_15");
     QTest::newRow("onPushButton_7") << QString("pushButton_7") <<1<< onPushButton_7;
+}
+
+
+void PuzzleManagerTest::testOnNewGame()
+{
+//Когда начинается новая игра, PuzzleManager отвечает только за перемешивание кнопок случайным образом.
+//Надо проверить, что когда срабатывает слот "OnNewGame()", новый порядок кнопок отвечает следующим требованиям:
+    //1) Он отличается от порядка кнопок в начале текущей игры
+    //2) В нём отсутствуют повторяющиеся значения (представлены все кнопки с 1 по 15)
+    //3) Последний элемент списка содержит пробел (символ пустой ячейки)
+    //4) Количество элементов QStringList = 16
+//Для этого выполняются следующие действия:
+
+    //1) Создаём упорядоченный список initialButtons с пробелом в конце. Этот список представляет исходное состояние кнопок при создании PuzzleManager.
+        //Поскольку в контексте тестирования слот "OnNewGame()" ни разу не запускался, для нас эта последовательность будет отправной точкой тестирования "OnNewGame()".
+    //2) Для проверки требований 2 и 4 создаём список "benchmark", являющийся копией списка "initialButtons".
+    //3) Создаём кнопку и связываем её сигнал со слотом "OnNewGame()";
+    //4) Создаём QSignalSpy и ловим QStringList, который наш PuzzleManager передаёт UI для отображения.
+    //5) Сравниваем полученный QStringList с initialButtons в разрезе требования 1. Поскольку в нормальной ситуации тут должен быть фейл, ставим макрос QEXPECT_FAIL, чтобы он игнорил ошибку.
+    //6) Чтобы убедиться, что в новом списке все кнопки уникальны и их 16 штук, мы сортируем прочитанный QSignalSpy список и список "benchmark" (приводим к одному состоянию) и сравниваем их.
+    //7) Требование 3 - проверяем последный символ прочитанного QSignalSpy списка.
+    //8) По мере прохождения теста сохраняем сигналенный список как "initialButtons" и повторяем проверку n раз.
+
+    QStringList initialButtons;
+    for (int i=1;i<=15;i++)
+    {
+        initialButtons<<QString("pushButton_%1").arg(i);
+    }
+    initialButtons<<QString(" ");
+
+
+    QStringList benchmark=initialButtons;
+    std::sort(benchmark.begin(),benchmark.end());
+    for (int i=0;i<10;i++)
+    {
+        QPushButton pushButt;
+        QObject::connect(&pushButt,SIGNAL(clicked()),&puzMan,SLOT(onNewGame()));
+        QSignalSpy jBond(&puzMan,SIGNAL(assignedOrder(QVariant)));
+        pushButt.click();
+        QVariant someVar=jBond.first().first();
+        QStringList someList=someVar.toStringList();
+        QStringList someListSorted=someList;
+        QEXPECT_FAIL("", "New button order must differ from the initial one",Continue);
+        QCOMPARE(someList,initialButtons);                      //Требование №1
+        std::sort(someListSorted.begin(),someListSorted.end());
+        QCOMPARE(someListSorted,benchmark);                     //Требования №2 и 4
+        QCOMPARE(someList.last(),QString(" "));                 //Требование №3
+        initialButtons=someList;
+    }
 }
 
 
