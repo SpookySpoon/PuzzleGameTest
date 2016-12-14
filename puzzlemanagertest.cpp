@@ -1,15 +1,12 @@
 #include <QtTest/QtTest>
-#include <QMessageBox>
-#include <QList>
+#include <QStringList>
 #include <QPushButton>
-#include <QDebug>
 #include "puzzlemanager.h"
 
 
 class PuzzleManagerTest : public QObject
 {
     Q_OBJECT
-
 private slots:
     void testOnPushedButtons();
     void testOnPushedButtons_data();
@@ -22,61 +19,57 @@ void PuzzleManagerTest::testOnPushedButtons()
     QPushButton pushButt;
     QObject::connect(&pushButt,SIGNAL(clicked()),&puzMan,SLOT(onPushedButton()));
     QSignalSpy jBond(&puzMan,SIGNAL(assignedOrder(QVariant)));
-    QSignalSpy jBonda(&pushButt,SIGNAL(clicked()));
     QFETCH(QString,buttonName);
     QFETCH(int,signalCount);
     QFETCH(QStringList,signalContent);
-    if(pushButt.objectName()!=buttonName)
-    {
-        pushButt.setObjectName(buttonName);
-        pushButt.click();
-    }
+//Механизм расчета позиции куска пазла таков основан на том, что PuzzleManager получает имя объекта -QObject::sender().
+//Затем, имея у себя QStringList имен кнопок в нужной последовательности, PuzzleManager при необходимости делает в своём QStringList и шлёт UI форме (puzzleform).
+//А дальше puzzleform настраивает раскладку кнопок согласно полученному QStringList.
 
+//Это я всё к тому, что в нижней строчке меняется имя QObject::sender()-а (в нашем случае - кнопки), чтобы спровоцировать разное поведение PuzzleManager.
+
+    pushButt.setObjectName(buttonName);
+    pushButt.click();
+//Дальше, собственно, сам тест.
     if(signalCount)
     {
         QCOMPARE(jBond.count(),1);
         QVariant someVar=jBond.first().first();
         QStringList someList=someVar.toStringList();
         QCOMPARE(someList,signalContent);
-//                QMessageBox opa;
-//                opa.setText(QString("Fetched FW is: %1, and signaled FW is: %2.").arg(someList.first()).arg(signalContent.first()));
-//                opa.exec();
     }
     else
     {
         QCOMPARE(jBond.count(),0);
     }
-
 }
 
 void PuzzleManagerTest::testOnPushedButtons_data()
 {
-//Исходный порядок кнопок "initialButtonOrder". Такой порядок задаётся в конструкторе PuzzleManagerTest
-//    QList<QString> initialButtonOrder;
-//    for (int i=1;i<=15;i++)
-//    {
-//        initialButtonOrder<<QString("pushButton_%1").arg(i);
-//    }
-//    initialButtonOrder<<QString(" ");
-//passiveButtons - кнопки, нажатие которых ничего не меняет (все, кроме №12 и №15).
-//    QList<QString> passiveButtons=initialButtonOrder;
-//    passiveButtons.removeLast();
-//    passiveButtons.removeLast();
-//    passiveButtons.removeAt(11);
-
+//Параметры
     QTest::addColumn<QString>( "buttonName" );
     QTest::addColumn<int>( "signalCount" );
     QTest::addColumn<QStringList>( "signalContent" );
 
-//    for(auto i:passiveButtons)
-//    {
-//        QList<QString> emptyList;
-//        QString iter=i;
-//        QTest::newRow(iter.toLatin1().data()) << i << 0 << emptyList;
-//    }
-//Дальше в таблицу тестирвоания добавляются списки кнопок, если двигать кнопки по спирали против часовой стрелки.
-//Сначала делал церез цикл (задал порядок кнопок и потом делал замену пробелов), но это в какой-то степени повоторение кода в тестируемой модели.
-//Если тестируемый код упадет, то в самом тестировании он наверняка тоже упадет, так что решил вручную вписать
+
+//Изначально в конструкторе PuzzleManager создаётся упорядоченный список с кнопками (такой порядок надо собрать).
+//Зная это, мы можем проверить поведение PuzzleManager в ответ на запрос разных кнопок и убедиться, что он их правильно сортирует.
+//Сначала добавляются строки с кнопками, никак не меняющими раскладку пазла (все, кроме кнопок №12 и №15).
+    QStringList passiveButtons;
+    for (int i=1;i<=14;i++)
+    {
+        passiveButtons<<QString("pushButton_%1").arg(i);
+    }
+    passiveButtons.removeAt(11); //удаляем кнопку №12
+    for(auto i:passiveButtons)
+    {
+        QStringList emptyList;
+        QTest::newRow(i.toLatin1().data()) << i << 0 << emptyList;
+    }
+//Дальше в таблицу тестирвоания добавляются списки кнопок, которые должен сигналить PuzzleManager,
+//если нажимать кнопки паззла по спирали против часовой стрелки, начиная с №15 - й.
+////P.S. Сначала делал церез цикл (задал порядок кнопок и потом делал замену пробелов), но это в какой-то степени повоторение кода в тестируемой модели.
+////Если тестируемый код упадет, то в самом тестировании он наверняка тоже упадет, так что решил вручную вписать
     QStringList onPushButton_15;
     onPushButton_15<<QString("pushButton_1")<<QString("pushButton_2")<<QString("pushButton_3")<<QString("pushButton_4")
                 <<QString("pushButton_5")<<QString("pushButton_6")<<QString("pushButton_7")<<QString("pushButton_8")
