@@ -1,24 +1,23 @@
 QT  += core gui
 QT  += widgets
+QT  += testlib
 
 CONFIG += c++11
-QT += testlib
-
-TARGET = Mainer
 CONFIG += console
-#CONFIG -= app_bundle
+TARGET = Mainer
 
 TEMPLATE = app
 
-SOURCES += main.cpp
+SOURCES += \
+#    congratulatortest.cpp \
+    puzzlemanagertest.cpp
 
 
+win32: LIBS += -L$$PWD/../../../Projects/build-SandBox2-Desktop_Qt_5_6_2_MinGW_32bit-Debug/debug/ -lSomeLib
 
-win32: LIBS += -L$$PWD/../SomeLib/debug/ -lSomeLib
+INCLUDEPATH += $$PWD/../../../Projects/build-SandBox2-Desktop_Qt_5_6_2_MinGW_32bit-Debug/debug
+INCLUDEPATH += $$PWD/../../../Projects/SandBox2
+DEPENDPATH += $$PWD/../../../Projects/build-SandBox2-Desktop_Qt_5_6_2_MinGW_32bit-Debug/debug
 
-INCLUDEPATH += $$PWD/../SomeLib
-INCLUDEPATH += $$PWD/../SomeLib/debug
-DEPENDPATH += $$PWD/../SomeLib/debug
-
-win32:!win32-g++: PRE_TARGETDEPS += $$PWD/../SomeLib/debug/SomeLib.lib
-else:win32-g++: PRE_TARGETDEPS += $$PWD/../SomeLib/debug/libSomeLib.a
+win32:!win32-g++: PRE_TARGETDEPS += $$PWD/../../../Projects/build-SandBox2-Desktop_Qt_5_6_2_MinGW_32bit-Debug/debug/SomeLib.lib
+else:win32-g++: PRE_TARGETDEPS += $$PWD/../../../Projects/build-SandBox2-Desktop_Qt_5_6_2_MinGW_32bit-Debug/debug/libSomeLib.a
