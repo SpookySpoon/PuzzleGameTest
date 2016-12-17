@@ -9,8 +9,8 @@ TARGET = Mainer
 TEMPLATE = app
 
 SOURCES += \
+    puzzlemanagertest.cpp
 #    congratulatortest.cpp \
-    staticfunctest.cpp
 
 
 win32: LIBS += -L$$PWD/../../../Projects/build-SandBox2-Desktop_Qt_5_6_2_MinGW_32bit-Debug/debug/ -lSomeLib

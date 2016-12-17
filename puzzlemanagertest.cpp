@@ -2,6 +2,7 @@
 #include <QStringList>
 #include <QPushButton>
 #include "puzzlemanager.h"
+#include "ui_puzzleform.h"
 
 
 class PuzzleManagerTest : public QObject
@@ -9,264 +10,185 @@ class PuzzleManagerTest : public QObject
     Q_OBJECT
 private slots:
     void testOnPushedButtons();
-    void testOnPushedButtons_data();
     void testOnNewGame();
     void testOnRestart();
 //    void testOnCheat(); //"Это не тестил так, как это незаконно (просто чит для отладки) =Р
 private:
-    PuzzleManager puzMan;
+//    Ui::PuzzleForm someUiPuzForm;
+//    PuzzleManager puzMan(someUiPuzForm);
+    QStringList initialButtons();
 };
 
 void PuzzleManagerTest::testOnPushedButtons()
 {
-//При нажатии сегмента пазла, он должен прыгнуть в пустую ячейку, если она есть рядом, либо остаться на месте, если её рядом нет.
-//Сначала проверяется, что те кнопки, которые должны оставаться на месте, остаются на месте.
-//Потом проверяется, что те кнопки, которые должны двигаться, двигаются правильно (для них правильно рассчитывается позиция).
-    QPushButton pushButt;
-    QObject::connect(&pushButt,SIGNAL(clicked()),&puzMan,SLOT(onPushedButton()));
-    QSignalSpy jBond(&puzMan,SIGNAL(assignedOrder(QVariant)));
-    QFETCH(QString,buttonName);
-    QFETCH(int,signalCount);
-    QFETCH(QStringList,signalContent);
-//Механизм расчета позиции куска пазла основан на том, что PuzzleManager получает имя кнопки через QObject::sender().
-//Затем, имея у себя QStringList имен кнопок в текущей последовательности, PuzzleManager при необходимости делает в своём QStringList перестановки и шлёт его UI форме (puzzleform).
-//А дальше puzzleform настраивает раскладку кнопок согласно полученному QStringList, в котором имена кнопок расположены в правильном порядке.
+//Сейчас (после того, как я переписал паззл) в этом слоте все рассчеты делаются статическими ф-ми и сигналов нет никаких.
+//Есть только UI класс в аргументе, который и меняется. Так что все изменения отражаются в раскладке UI кнопок. Их и проверяем.
+//Поскольку в данном слотеиспользуются оттестированные функции класса StaticFunctions, мы проверяем всего один сценарий, чтобы убедиться,
+    //что UI в принципе реагирует.
+//Для этого мы создаём UI класс, проверяем, что там правильный исходный порядок (по возрастанию), двигаем 15 кнопку, проверяем, что 15 кнопка двинулась.
 
-//Это я всё к тому, что в нижней строчке меняется имя QObject::sender()-а (в нашем случае - кнопки), чтобы спровоцировать разное поведение PuzzleManager.
-    pushButt.setObjectName(buttonName);
-    pushButt.click();
-//Дальше, собственно, сам тест.
-    if(signalCount)
+    Ui::PuzzleForm someUiPuzFormTest;
+    QWidget tempW;
+    someUiPuzFormTest.setupUi(&tempW);
+    PuzzleManager puzManTest(&someUiPuzFormTest);
+    QStringList initialButtonsOrder = initialButtons();
+    int gridRows=someUiPuzFormTest.gridLayout->rowCount();
+    int gridColumns=someUiPuzFormTest.gridLayout->columnCount();
+ //Проверяем исходный порядок
+    for (int row=0;row<gridRows;row++)
     {
-        QCOMPARE(jBond.count(),1);
-        QVariant someVar=jBond.first().first();
-        QStringList someList=someVar.toStringList();
-        QCOMPARE(someList,signalContent);
+        for (int column=0;column<gridColumns;column++)
+        {
+            int listIndex=row*gridColumns+column;
+            QLayoutItem* button = someUiPuzFormTest.gridLayout->itemAtPosition(row,column);
+            if(button)
+            {
+                QCOMPARE(initialButtonsOrder.at(listIndex),button->widget()->objectName());
+            }
+            else
+            {
+                QCOMPARE(initialButtonsOrder.at(listIndex),QString(" "));
+            }
+        }
     }
-    else
-    {
-        QCOMPARE(jBond.count(),0);
-    }
+//Создаём связь и двигаем кнопку
+    QPushButton* opaButt=someUiPuzFormTest.pushButton_15;
+    QObject::connect(opaButt,SIGNAL(clicked()),&puzManTest,SLOT(onPushedButton()));
+    opaButt->click();
+    QLayoutItem* lA=someUiPuzFormTest.gridLayout->itemAtPosition(gridRows-1,gridColumns-1);
+    QVERIFY(lA!=0);
+    QString pButName=lA->widget()->objectName();
+
+    //Проверяем где кнопка
+    QCOMPARE(pButName,QString("pushButton_15"));
 }
 
-void PuzzleManagerTest::testOnPushedButtons_data()
-{
-//Параметры
-    QTest::addColumn<QString>( "buttonName" );
-    QTest::addColumn<int>( "signalCount" );
-    QTest::addColumn<QStringList>( "signalContent" );
-
-
-//Изначально в конструкторе PuzzleManager создаётся упорядоченный список с кнопками (такой порядок надо собрать).
-//Зная это, мы можем проверить поведение PuzzleManager в ответ на запрос разных кнопок и убедиться, что он их правильно сортирует.
-//Сначала добавляются строки с кнопками, никак не меняющими раскладку пазла (все, кроме кнопок №12 и №15).
-    QStringList passiveButtons;
-    for (int i=1;i<=14;i++)
-    {
-        passiveButtons<<QString("pushButton_%1").arg(i);
-    }
-    passiveButtons.removeAt(11); //удаляем кнопку №12
-    for(auto i:passiveButtons)
-    {
-        QStringList emptyList;
-        QTest::newRow(i.toLatin1().data()) << i << 0 << emptyList;
-    }
-//Дальше в таблицу тестирвоания добавляются списки кнопок, которые должен сигналить PuzzleManager,
-//если нажимать кнопки паззла по спирали против часовой стрелки, начиная с №15 - й.
-////P.S. Сначала делал церез цикл (задал порядок кнопок и потом делал замену пробелов), но это в какой-то степени повоторение кода в тестируемой модели.
-////Если тестируемый код упадет, то в самом тестировании он наверняка тоже упадет, так что решил вручную вписать
-    QStringList onPushButton_15;
-    onPushButton_15<<QString("pushButton_1")<<QString("pushButton_2")<<QString("pushButton_3")<<QString("pushButton_4")
-                <<QString("pushButton_5")<<QString("pushButton_6")<<QString("pushButton_7")<<QString("pushButton_8")
-               <<QString("pushButton_9")<<QString("pushButton_10")<<QString("pushButton_11")<<QString("pushButton_12")
-              <<QString("pushButton_13")<<QString("pushButton_14")<<QString(" ")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_15") << QString("pushButton_15") <<1<< onPushButton_15;
-    QStringList onPushButton_14;
-    onPushButton_14<<QString("pushButton_1")<<QString("pushButton_2")<<QString("pushButton_3")<<QString("pushButton_4")
-                <<QString("pushButton_5")<<QString("pushButton_6")<<QString("pushButton_7")<<QString("pushButton_8")
-               <<QString("pushButton_9")<<QString("pushButton_10")<<QString("pushButton_11")<<QString("pushButton_12")
-              <<QString("pushButton_13")<<QString(" ")<<QString("pushButton_14")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_14") << QString("pushButton_14") <<1<< onPushButton_14;
-    QStringList onPushButton_13;
-    onPushButton_13<<QString("pushButton_1")<<QString("pushButton_2")<<QString("pushButton_3")<<QString("pushButton_4")
-                <<QString("pushButton_5")<<QString("pushButton_6")<<QString("pushButton_7")<<QString("pushButton_8")
-               <<QString("pushButton_9")<<QString("pushButton_10")<<QString("pushButton_11")<<QString("pushButton_12")
-              <<QString(" ")<<QString("pushButton_13")<<QString("pushButton_14")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_13") << QString("pushButton_13") <<1<< onPushButton_13;
-    QStringList onPushButton_9;
-    onPushButton_9<<QString("pushButton_1")<<QString("pushButton_2")<<QString("pushButton_3")<<QString("pushButton_4")
-                <<QString("pushButton_5")<<QString("pushButton_6")<<QString("pushButton_7")<<QString("pushButton_8")
-               <<QString(" ")<<QString("pushButton_10")<<QString("pushButton_11")<<QString("pushButton_12")
-              <<QString("pushButton_9")<<QString("pushButton_13")<<QString("pushButton_14")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_9") << QString("pushButton_9") <<1<< onPushButton_9;
-    QStringList onPushButton_5;
-    onPushButton_5<<QString("pushButton_1")<<QString("pushButton_2")<<QString("pushButton_3")<<QString("pushButton_4")
-                <<QString(" ")<<QString("pushButton_6")<<QString("pushButton_7")<<QString("pushButton_8")
-               <<QString("pushButton_5")<<QString("pushButton_10")<<QString("pushButton_11")<<QString("pushButton_12")
-              <<QString("pushButton_9")<<QString("pushButton_13")<<QString("pushButton_14")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_5") << QString("pushButton_5") <<1<< onPushButton_5;
-    QStringList onPushButton_1;
-    onPushButton_1<<QString(" ")<<QString("pushButton_2")<<QString("pushButton_3")<<QString("pushButton_4")
-                <<QString("pushButton_1")<<QString("pushButton_6")<<QString("pushButton_7")<<QString("pushButton_8")
-               <<QString("pushButton_5")<<QString("pushButton_10")<<QString("pushButton_11")<<QString("pushButton_12")
-              <<QString("pushButton_9")<<QString("pushButton_13")<<QString("pushButton_14")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_1") << QString("pushButton_1") <<1<< onPushButton_1;
-    QStringList onPushButton_2;
-    onPushButton_2<<QString("pushButton_2")<<QString(" ")<<QString("pushButton_3")<<QString("pushButton_4")
-                <<QString("pushButton_1")<<QString("pushButton_6")<<QString("pushButton_7")<<QString("pushButton_8")
-               <<QString("pushButton_5")<<QString("pushButton_10")<<QString("pushButton_11")<<QString("pushButton_12")
-              <<QString("pushButton_9")<<QString("pushButton_13")<<QString("pushButton_14")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_2") << QString("pushButton_2") <<1<< onPushButton_2;
-    QStringList onPushButton_3;
-    onPushButton_3<<QString("pushButton_2")<<QString("pushButton_3")<<QString(" ")<<QString("pushButton_4")
-                <<QString("pushButton_1")<<QString("pushButton_6")<<QString("pushButton_7")<<QString("pushButton_8")
-               <<QString("pushButton_5")<<QString("pushButton_10")<<QString("pushButton_11")<<QString("pushButton_12")
-              <<QString("pushButton_9")<<QString("pushButton_13")<<QString("pushButton_14")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_3") << QString("pushButton_3") <<1<< onPushButton_3;
-    QStringList onPushButton_4;
-    onPushButton_4<<QString("pushButton_2")<<QString("pushButton_3")<<QString("pushButton_4")<<QString(" ")
-                <<QString("pushButton_1")<<QString("pushButton_6")<<QString("pushButton_7")<<QString("pushButton_8")
-               <<QString("pushButton_5")<<QString("pushButton_10")<<QString("pushButton_11")<<QString("pushButton_12")
-              <<QString("pushButton_9")<<QString("pushButton_13")<<QString("pushButton_14")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_4") << QString("pushButton_4") <<1<< onPushButton_4;
-    QStringList onPushButton_8;
-    onPushButton_8<<QString("pushButton_2")<<QString("pushButton_3")<<QString("pushButton_4")<<QString("pushButton_8")
-                <<QString("pushButton_1")<<QString("pushButton_6")<<QString("pushButton_7")<<QString(" ")
-               <<QString("pushButton_5")<<QString("pushButton_10")<<QString("pushButton_11")<<QString("pushButton_12")
-              <<QString("pushButton_9")<<QString("pushButton_13")<<QString("pushButton_14")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_8") << QString("pushButton_8") <<1<< onPushButton_8;
-    QStringList onPushButton_12;
-    onPushButton_12<<QString("pushButton_2")<<QString("pushButton_3")<<QString("pushButton_4")<<QString("pushButton_8")
-                <<QString("pushButton_1")<<QString("pushButton_6")<<QString("pushButton_7")<<QString("pushButton_12")
-               <<QString("pushButton_5")<<QString("pushButton_10")<<QString("pushButton_11")<<QString(" ")
-              <<QString("pushButton_9")<<QString("pushButton_13")<<QString("pushButton_14")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_12") << QString("pushButton_12") <<1<< onPushButton_12;
-    QStringList onPushButton_11;
-    onPushButton_11<<QString("pushButton_2")<<QString("pushButton_3")<<QString("pushButton_4")<<QString("pushButton_8")
-                <<QString("pushButton_1")<<QString("pushButton_6")<<QString("pushButton_7")<<QString("pushButton_12")
-               <<QString("pushButton_5")<<QString("pushButton_10")<<QString(" ")<<QString("pushButton_11")
-              <<QString("pushButton_9")<<QString("pushButton_13")<<QString("pushButton_14")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_11") << QString("pushButton_11") <<1<< onPushButton_11;
-    QStringList onPushButton_10;
-    onPushButton_10<<QString("pushButton_2")<<QString("pushButton_3")<<QString("pushButton_4")<<QString("pushButton_8")
-                <<QString("pushButton_1")<<QString("pushButton_6")<<QString("pushButton_7")<<QString("pushButton_12")
-               <<QString("pushButton_5")<<QString(" ")<<QString("pushButton_10")<<QString("pushButton_11")
-              <<QString("pushButton_9")<<QString("pushButton_13")<<QString("pushButton_14")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_10") << QString("pushButton_10") <<1<< onPushButton_10;
-    QStringList onPushButton_6;
-    onPushButton_6<<QString("pushButton_2")<<QString("pushButton_3")<<QString("pushButton_4")<<QString("pushButton_8")
-                <<QString("pushButton_1")<<QString(" ")<<QString("pushButton_7")<<QString("pushButton_12")
-               <<QString("pushButton_5")<<QString("pushButton_6")<<QString("pushButton_10")<<QString("pushButton_11")
-              <<QString("pushButton_9")<<QString("pushButton_13")<<QString("pushButton_14")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_6") << QString("pushButton_6") <<1<< onPushButton_6;
-    QStringList onPushButton_7;
-    onPushButton_7<<QString("pushButton_2")<<QString("pushButton_3")<<QString("pushButton_4")<<QString("pushButton_8")
-                <<QString("pushButton_1")<<QString("pushButton_7")<<QString(" ")<<QString("pushButton_12")
-               <<QString("pushButton_5")<<QString("pushButton_6")<<QString("pushButton_10")<<QString("pushButton_11")
-              <<QString("pushButton_9")<<QString("pushButton_13")<<QString("pushButton_14")<<QString("pushButton_15");
-    QTest::newRow("onPushButton_7") << QString("pushButton_7") <<1<< onPushButton_7;
-}
 
 void PuzzleManagerTest::testOnNewGame()
 {
 //Когда начинается новая игра, PuzzleManager отвечает только за перемешивание кнопок случайным образом.
+//В этом слоте работает функция StaticFunctions::shuffleList, которая уже протещена.
+//Поэтому тут тоже тестируется минимум.
 //Надо проверить, что когда срабатывает слот "OnNewGame()", новый порядок кнопок отвечает следующим требованиям:
     //1) Он отличается от порядка кнопок в начале текущей игры
     //2) В нём отсутствуют повторяющиеся значения (представлены все кнопки с 1 по 15)
     //3) Последний элемент списка содержит пробел (символ пустой ячейки)
     //4) Количество элементов QStringList = 16
 //Для этого выполняются следующие действия:
+    //1) Создаётся новый UI файл. Корректность исходного расположения кнопок проверялась в тесте testOnPushedButtons(). Так что здесь это не првоеряем.
+    //2) Создаём PuzzleManager и связываем его слот onNewGame() с кнопкой.
+    //3) Нажимаем кнопку, составляем список расположения кнопок
+    //4) Проверяем, что получившийся порядок кнопок отличается от исходного.
+    //5) Проверяем, что в списке представлены все 15 кнопок, что последняя кнопка пустая.
+//1)
+    QStringList initialButtonsOrder = initialButtons();
+    Ui::PuzzleForm someUiPuzFormTest;
+    QWidget tempW;
+    someUiPuzFormTest.setupUi(&tempW);
+//2)
+    PuzzleManager puzManTest(&someUiPuzFormTest);
+    QPushButton* opaButt=someUiPuzFormTest.buttonShuffle;
+    QObject::connect(opaButt,SIGNAL(clicked()),&puzManTest,SLOT(onNewGame()));
+//3)
+    opaButt->click();
 
-    //1) Создаём упорядоченный список initialButtons с пробелом в конце. Этот список представляет исходное состояние кнопок при создании PuzzleManager.
-        //Поскольку в контексте тестирования слот "OnNewGame()" ни разу не запускался, для нас эта последовательность будет отправной точкой тестирования "OnNewGame()".
-    //2) Для проверки требований 2 и 4 создаём список "benchmark", являющийся копией списка "initialButtons".
-    //3) Создаём кнопку и связываем её сигнал со слотом "OnNewGame()";
-    //4) Создаём QSignalSpy и ловим QStringList, который наш PuzzleManager передаёт UI для отображения.
-    //5) Сравниваем полученный QStringList с initialButtons в разрезе требования 1. Поскольку в нормальной ситуации тут должен быть фейл, ставим макрос QEXPECT_FAIL, чтобы он игнорил ошибку.
-    //6) Чтобы убедиться, что в новом списке все кнопки уникальны и их 16 штук, мы сортируем прочитанный QSignalSpy список и список "benchmark" (приводим к одному состоянию) и сравниваем их.
-    //7) Требование 3 - проверяем последный символ прочитанного QSignalSpy списка.
-    //8) По мере прохождения теста сохраняем сигналенный список как "initialButtons" и повторяем проверку n раз.
+    QStringList NewOrder;
+    int gridRows=someUiPuzFormTest.gridLayout->rowCount();
+    int gridColumns=someUiPuzFormTest.gridLayout->columnCount();
 
-    QStringList initialButtons;
-    for (int i=1;i<=15;i++)
+    for (int row=0;row<gridRows;row++)
     {
-        initialButtons<<QString("pushButton_%1").arg(i);
+        for (int column=0;column<gridColumns;column++)
+        {
+            QLayoutItem* button = someUiPuzFormTest.gridLayout->itemAtPosition(row,column);
+            if(button)
+            {
+                NewOrder.append(button->widget()->objectName());
+            }
+            else
+            {
+                NewOrder.append(QString(" "));
+            }
+        }
     }
-    initialButtons<<QString(" ");
-
-
-    QStringList benchmark=initialButtons;
-    std::sort(benchmark.begin(),benchmark.end());
-    for (int i=0;i<10;i++)
-    {
-        QPushButton pushButt;
-        QObject::connect(&pushButt,SIGNAL(clicked()),&puzMan,SLOT(onNewGame()));
-        QSignalSpy jBond(&puzMan,SIGNAL(assignedOrder(QVariant)));
-        pushButt.click();
-        QVariant someVar=jBond.first().first();
-        QStringList someList=someVar.toStringList();
-        QStringList someListSorted=someList;
-        QVERIFY(someList!=initialButtons);                      //Требование №1
-        std::sort(someListSorted.begin(),someListSorted.end());
-        QCOMPARE(someListSorted,benchmark);                     //Требования №2 и 4
-        QCOMPARE(someList.last(),QString(" "));                 //Требование №3
-        initialButtons=someList;
-    }
+//4)
+    QVERIFY(initialButtonsOrder!=NewOrder);
+//5)
+    QCOMPARE(NewOrder.last(),QString(" "));
+    std::sort(NewOrder.begin(),NewOrder.end());
+    std::sort(initialButtonsOrder.begin(),initialButtonsOrder.end());
+    QCOMPARE(initialButtonsOrder,NewOrder);
 }
+
+
+
 
 void PuzzleManagerTest::testOnRestart()
 {
 //Тут просто паззл откатывается к исходной последователььности фрагментов (имен кнопок в списке, который задаётся сразу после слота "OnNewGame()".
-//Следовательно проверить надо только то, что понажимав какие-то кнопки, если мы запустим "OnNewGame()", то PuzzleManager отправит UI список кнопок такой-же
-    //который он отправлял UI сразу после активации "OnNewGame()".
+//Следовательно проверить надо только то, что понажимав какие-то кнопки, если мы запустим "OnRestart()", то UI вернет кнопки в исходное положение
 //Для проверки этого, мы делаем следующее:
-    //1) Активируем "OnNewGame()", записываем сформировавшийся порядок кнопок (поскольку мы уже активировали "OnNewGame()" в предыдущем тесте,
-        //здесь мы уже не можем сравнивать результаты с упорядоченной последовательностью.
-    //2)Прожимаем все кнопки новой последовательности, кроме пробела(как минимум одна кнопка должна сдвинуться с места,
-        //а поскольку мы двигаемся по списку, повторно мы эту кнопку не сможем нажать и на место она не вернется. Т.е. нет риска, что у нас не пройдёт следующий тест).
-    //3)Убеждаемся, что получившийся список отличается от исходного (небольшая страховка, что все кнопки сработали. По сути это покрывается тестом testOnPushedButtons())
-        //Также убеждаемся, что получившийся список не пустой. Потому что, если он пустой, то это вообще фигня какая-то и нопки не двигались.
-    //4) Активируем OnRestart() и сравниваем вытащенный из сигнала список с тем списком, который мы записали в шаге 1. Они должны быть одинаковы.
-//Шаг 1
-    QPushButton pushButtNG;
-    QObject::connect(&pushButtNG,SIGNAL(clicked()),&puzMan,SLOT(onNewGame()));
-    QSignalSpy jBond(&puzMan,SIGNAL(assignedOrder(QVariant)));
-    pushButtNG.click();
-    QVariant someVar=jBond.first().first();
-    QStringList initialList=someVar.toStringList();
-    QCOMPARE(initialList.last(),QString(" "));//Просто по ходу теста смотрим, что в новом списке в конце стоит пробел
-    initialList.removeLast();
-//Шаг 2
-    QStringList tempList;
-    QString obana;
-    for (auto i:initialList)
+    //1) Создаём новый UI класс
+    //2) Нажимаем 15 кнопку
+    //3) Проверяем, что она сдвинулась
+    //4) Активируем OnRestart()
+    //5) Проверяем, что все кнопки вернулись на место
+//1)
+    QStringList initialButtonsOrder = initialButtons();
+    Ui::PuzzleForm someUiPuzFormTest;
+    QWidget tempW;
+    someUiPuzFormTest.setupUi(&tempW);
+    PuzzleManager puzManTest(&someUiPuzFormTest);
+    QPushButton opaButt;
+    opaButt.setObjectName(QString("pushButton_15"));
+    QObject::connect(&opaButt,SIGNAL(clicked()),&puzManTest,SLOT(onPushedButton()));
+//2)
+    opaButt.click();
+//3)
+    QLayoutItem* button = someUiPuzFormTest.gridLayout->itemAtPosition(3,3);
+    QVERIFY(button!=0);
+    QCOMPARE(button->widget()->objectName(),QString("pushButton_15"));
+//4)
+    QPushButton butRestart;
+    QObject::connect(&butRestart,SIGNAL(clicked()),&puzManTest,SLOT(onRestart()));
+    butRestart.click();
+//5)
+    int gridRows=someUiPuzFormTest.gridLayout->rowCount();
+    int gridColumns=someUiPuzFormTest.gridLayout->columnCount();
+
+    for (int row=0;row<gridRows;row++)
     {
-        QVERIFY(i!=QString(" "));//Просто по ходу теста смотрим, что нету лишних пробелов в списке
-        QPushButton pushPuzButt;
-        QObject::connect(&pushPuzButt,SIGNAL(clicked()),&puzMan,SLOT(onPushedButton()));
-        QSignalSpy jBondPuzzleButt(&puzMan,SIGNAL(assignedOrder(QVariant)));
-        pushPuzButt.setObjectName(i);//Меняем имя кнопки, чтобы PuzzleManager знал, кто его позвал.
-        pushPuzButt.click();
-        if(!jBondPuzzleButt.isEmpty())
+        for (int column=0;column<gridColumns;column++)
         {
-            QVariant samoVar=jBondPuzzleButt.first().first();
-            tempList.clear();
-            tempList=samoVar.toStringList();
+            int listIndex=row*gridColumns+column;
+            QLayoutItem* button = someUiPuzFormTest.gridLayout->itemAtPosition(row,column);
+            if(button)
+            {
+                QCOMPARE(initialButtonsOrder.at(listIndex),button->widget()->objectName());
+            }
+            else
+            {
+                QCOMPARE(initialButtonsOrder.at(listIndex),QString(" "));
+            }
         }
     }
-//Шаг 3
-    QVERIFY(tempList.count()==16);
-    initialList<<QString(" ");//Возвращаем конфискованный пробел
-    QVERIFY(tempList!=initialList);
-//Шаг 4
-    QPushButton pushButtReset;
-    QObject::connect(&pushButtReset,SIGNAL(clicked()),&puzMan,SLOT(onRestart()));
-    QSignalSpy jBondRestart(&puzMan,SIGNAL(assignedOrder(QVariant)));
-    pushButtReset.click();
-    QVariant someRVar=jBondRestart.first().first();
-    QStringList listAfterRestart=someRVar.toStringList();
-    QCOMPARE(initialList,listAfterRestart);//Должны быть одинаковыми
 }
+
+QStringList PuzzleManagerTest::initialButtons()
+{
+    QStringList wO;
+    for (int i=1;i<=15;i++)
+    {
+        wO<<QString("pushButton_%1").arg(i);
+    }
+    wO<<QString(" ");
+
+    return wO;
+
+}
+
+
+
 
 QTEST_MAIN(PuzzleManagerTest)
 #include "puzzlemanagertest.moc"
