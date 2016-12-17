@@ -9,7 +9,9 @@ TARGET = Mainer
 TEMPLATE = app
 
 SOURCES += \
-    puzzlemanagertest.cpp
+    gameenginetest.cpp \
+    puzzlemanagertest.cpp \
+    staticfunctest.cpp
 #    congratulatortest.cpp \
 
 

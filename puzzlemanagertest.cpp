@@ -12,7 +12,6 @@ private slots:
     void testOnPushedButtons();
     void testOnNewGame();
     void testOnRestart();
-//    void testOnCheat(); //"Это не тестил так, как это незаконно (просто чит для отладки) =Р
 private:
 //    Ui::PuzzleForm someUiPuzForm;
 //    PuzzleManager puzMan(someUiPuzForm);

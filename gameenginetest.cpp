@@ -1,13 +1,14 @@
+#include <QMessageBox>
 #include <QtTest/QtTest>
 #include <QThread>
+#include <QTimer>
 #include <QPair>
 #include <QStringList>
 #include <QPushButton>
-#include <QMessageBox>
 #include "gameengine.h"
 #include "scorekeeper.h"
 #include "congratulator.h"
-
+#include "ui_puzzleform.h"
 
 
 class GameEngineTest : public QObject
@@ -16,9 +17,11 @@ class GameEngineTest : public QObject
 private slots:
     void testNewGame();
     void testTryAgain();
-    void testOnWin();
+    void testOnWOn();//Вот этот засранец, я с ним долго просидел и в итоге подпёр костылем. См. вопрос в самом слоте.
+    void inThread();
 private:
     GameEngine gE;
+    QThread myThread;
 };
 
 
@@ -43,33 +46,38 @@ void GameEngineTest::testTryAgain()
     QCOMPARE(jBondTA.count(),1);
 }
 
-void GameEngineTest::testOnWin()
+void GameEngineTest::testOnWOn()
 {
-    qRegisterMetaType<QPair<int,int>>();
-    GameEngine* someGE = new GameEngine;
-    QThread*  someThread= new QThread;
+    //Прежде чем задать вопрос обрисую ситуацию
+    //Всё что делает этот слот, это создание класса Congratulator, управляющего окном результатов игры.
+    //Этот класс открывает окно в диалоговом режиме, которое блокирует главный тред.
+    //ЧТобы проверить, что этот слот работает корректно и Congratulator запустился,
+        //я решил воспользоваться поиском детей класса GameEngine с определенным именем, которое в этом слоте присваивается классу Congratulator
+    //Но проблема была в том, что пока Congratulator существует, я не могу посчитать детей, а когда мы закрываем окно, созданное классом Congratulator,
+        // детей с именем, присвоенным Congratulator мы уже найти не можем, потмоучто их нет.
+    //Поэтому я запустил слот inThread() в новом потоке, где я ищу детей класса GameEngine, пока открыто диалоговое окно Congratulator.
 
-    ScoreKeeper* sKeeper = new ScoreKeeper;
-    QObject::connect(someThread,SIGNAL(started()),sKeeper,SLOT(stopTracking()));
-    QObject::connect(sKeeper,SIGNAL(reportScore(QPair<int,int>)),someGE,SLOT(onWin(QPair<int,int>)));
-    someGE->moveToThread(someThread);
-    sKeeper->moveToThread(someThread);
-    someThread->start();
-    QTest::qWait(1000);
-    QSignalSpy jBondTA(sKeeper,SIGNAL(reportScore(QPair<int,int>)));
+    //Теперь вопрос - у меня поток со слотом inThread() запускается до того, как я активирую слот onWin(QPair<int,int>) класса GameEngine.
+    //Следовательно инструкция создать Congratulator идет после того, как я отпустил инструкцию узнать количество детей с именем "Congratulator".
+    //Тем не менее, моим методом программа успевает создать Congratulator до того, как слот inThread() начнет искать детей и у меня тест проходит успешно.
+    //ВОпрос - при таком раскладе может ли быть ситуация, когда inThread() выполнит инструкции в своём потоке раньше, чем в главном потоке будет создан Congratulator?
+    //Тоесть может ли из за этого не сработать тест?
 
-    QPair<int,int> stats(50,50);
-    QList<Congratulator*> childStatement = someGE->findChildren<Congratulator*>(QString("Congratulator"));
-    QCOMPARE(childStatement.count(),0);
+    int cNum=gE.findChildren<Congratulator*>(QString("Congratulator")).count();
+    QCOMPARE(cNum,0);
+    moveToThread(&myThread);
+    connect(&myThread, SIGNAL(started()), this, SLOT(inThread()));
+    myThread.start();
+    QPair<int,int> opAr(50,50);
+    gE.onWin(opAr);
+    myThread.exit();
+}
 
-    sKeeper->reportScore(stats);
-    QList<Congratulator*> childStatement1 = someGE->findChildren<Congratulator*>(QString("Congratulator"));
-    qDebug()<<"finish";
-
-    QCOMPARE(jBondTA.count(),1);
-    QCOMPARE(childStatement1.count(),1);
-    someGE->deleteLater();
-    someThread->deleteLater();
+void GameEngineTest::inThread()
+{
+//    QThread::currentThread()->wait(1000);
+    int cNum=gE.findChildren<Congratulator*>(QString("Congratulator")).count();
+    QCOMPARE(cNum,1);
 
 }
 
