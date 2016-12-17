@@ -30,6 +30,7 @@ private:
 
 void StaticFuncTest::puzzleMoverTest()
 {
+    //проверяем, что функция правильно вычисляет положение пустой ячейки
     QFETCH(QStringList,disposition);
     QFETCH(QString,button);
     QFETCH(QStringList,result);
@@ -111,6 +112,7 @@ void StaticFuncTest::puzzleMoverTest_data()
 
 void StaticFuncTest::transPuzOrderTest()
 {
+    //проверяем, что функция правильно переводит порядок имен кнопок в QStringList с именами кнопок в UI класс (правильно двигает кнопки)
     QFETCH(QStringList,ButtonListRequest);
     QWidget someW;
     someUiPuzForm.setupUi(&someW);
@@ -185,7 +187,7 @@ void StaticFuncTest::shuffleList()
     }
     buttonsAfterShuffle=buttonsBeforeShuffle;
     StaticFunctions::shuffleList(buttonsAfterShuffle);
-    //Проверяем, что разные списки после прогона функции
+    //Проверяем, что списки отличаются после прогона функции
     QVERIFY(buttonsAfterShuffle!=buttonsBeforeShuffle);
     //Проверяем, что пробел стоит в конце
     QCOMPARE(buttonsAfterShuffle.last(),QString(" "));
@@ -197,6 +199,7 @@ void StaticFuncTest::shuffleList()
 
 void StaticFuncTest::getWinningOrderTest()
 {
+    //Эта функция- аналог глобальной переменной, с которой можно сверяться в puzzlemanager.cpp
     QStringList wO;
     for (int i=1;i<=15;i++)
     {
