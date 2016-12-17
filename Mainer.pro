@@ -10,12 +10,13 @@ TEMPLATE = app
 
 SOURCES += \
 #    congratulatortest.cpp \
-    gameenginetest.cpp
+    staticfunctest.cpp
 
 
 win32: LIBS += -L$$PWD/../../../Projects/build-SandBox2-Desktop_Qt_5_6_2_MinGW_32bit-Debug/debug/ -lSomeLib
 
 INCLUDEPATH += $$PWD/../../../Projects/build-SandBox2-Desktop_Qt_5_6_2_MinGW_32bit-Debug/debug
+INCLUDEPATH += $$PWD/../../../Projects/build-SandBox2-Desktop_Qt_5_6_2_MinGW_32bit-Debug
 INCLUDEPATH += $$PWD/../../../Projects/SandBox2
 DEPENDPATH += $$PWD/../../../Projects/build-SandBox2-Desktop_Qt_5_6_2_MinGW_32bit-Debug/debug
 

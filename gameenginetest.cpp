@@ -21,6 +21,8 @@ private:
     GameEngine gE;
 };
 
+
+
 void GameEngineTest::testNewGame()
 {
     QPushButton pushButt;
@@ -43,23 +45,24 @@ void GameEngineTest::testTryAgain()
 
 void GameEngineTest::testOnWin()
 {
-
+    qRegisterMetaType<QPair<int,int>>();
     GameEngine* someGE = new GameEngine;
     QThread*  someThread= new QThread;
 
-    ScoreKeeper sKeeper;
-    QObject::connect(someThread,SIGNAL(started()),&sKeeper,SLOT(stopTracking()));
-    QObject::connect(&sKeeper,SIGNAL(reportScore(QPair<int,int>)),someGE,SLOT(onWin(QPair<int,int>)));
+    ScoreKeeper* sKeeper = new ScoreKeeper;
+    QObject::connect(someThread,SIGNAL(started()),sKeeper,SLOT(stopTracking()));
+    QObject::connect(sKeeper,SIGNAL(reportScore(QPair<int,int>)),someGE,SLOT(onWin(QPair<int,int>)));
     someGE->moveToThread(someThread);
+    sKeeper->moveToThread(someThread);
     someThread->start();
     QTest::qWait(1000);
-    QSignalSpy jBondTA(&sKeeper,SIGNAL(reportScore(QPair<int,int>)));
+    QSignalSpy jBondTA(sKeeper,SIGNAL(reportScore(QPair<int,int>)));
 
     QPair<int,int> stats(50,50);
     QList<Congratulator*> childStatement = someGE->findChildren<Congratulator*>(QString("Congratulator"));
     QCOMPARE(childStatement.count(),0);
 
-    sKeeper.reportScore(stats);
+    sKeeper->reportScore(stats);
     QList<Congratulator*> childStatement1 = someGE->findChildren<Congratulator*>(QString("Congratulator"));
     qDebug()<<"finish";
 
